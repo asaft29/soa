@@ -1,19 +1,52 @@
-use axum::{Router, routing::get};
-use std::net::SocketAddr;
+use std::sync::Arc;
+
+use anyhow::Result;
+use axum::{Router, extract::State, routing::get};
+use event_service::{handlers, repositories::event_repo::EventRepo};
+use sqlx::postgres::PgPoolOptions;
+use tower_http::trace::TraceLayer;
+use tracing::{Level, info};
 
 #[tokio::main]
-async fn main() {
-    tracing_subscriber::fmt::init();
+async fn main() -> Result<()> {
+    tracing_subscriber::fmt()
+        .with_max_level(Level::INFO)
+        .compact()
+        .init();
 
-    let app = Router::new().route("/", get(check));
+    let db_url = std::env::var("DATABASE_URL").expect("DATABASE_URL env var is not set!");
 
-    let addr = SocketAddr::from(([0, 0, 0, 0], 8080));
-    tracing::info!("Event service listening on {}", addr);
+    let pool = PgPoolOptions::new()
+        .max_connections(5)
+        .connect(&db_url)
+        .await?;
 
-    let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
-    axum::serve(listener, app).await.unwrap();
+    info!("{:<12} - Database connection pool created.", "DB");
+
+    let repo = Arc::new(EventRepo::new(pool.clone()));
+
+    // Correct router setup
+    let app = Router::new()
+        .route("/api", get(check_state))
+        .nest(
+            "/api/event-manager",
+            handlers::routes::event_manager_router(),
+        )
+        .layer(TraceLayer::new_for_http()) // top-level layer
+        .with_state(repo); // top-level state
+
+    let listener = tokio::net::TcpListener::bind("0.0.0.0:8080").await?;
+    info!("{:<12} - {:?}\n", "LISTENING", listener.local_addr());
+
+    // Use axum::serve
+    axum::serve(listener, app).await?;
+
+    Ok(())
 }
 
-async fn check() -> &'static str {
-    "OK"
+async fn check_state(State(repo): State<Arc<EventRepo>>) -> &'static str {
+    match repo.check().await {
+        Ok(_) => "PostgreSQL works! :p",
+        Err(_) => "PostgreSQL DOESN'T work! :(",
+    }
 }

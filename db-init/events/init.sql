@@ -13,18 +13,18 @@ CREATE TABLE UTILIZATORI (
 
 CREATE TABLE EVENIMENTE (
     ID          SERIAL          PRIMARY KEY,
-    ID_OWNER    INTEGER         NOT NULL REFERENCES UTILIZATORI(ID), 
-    nume        VARCHAR(255)    UNIQUE NOT NULL, 
-    locatie     VARCHAR(255)    NULL,        
+    ID_OWNER    INTEGER         NOT NULL REFERENCES UTILIZATORI(ID),
+    nume        VARCHAR(255)    UNIQUE NOT NULL,
+    locatie     VARCHAR(255)    NOT NULL,
     descriere   TEXT            NULL,
-    numarLocuri INTEGER         NULL 
+    numarLocuri INTEGER         NULL
 );
 
 CREATE TABLE PACHETE (
     ID          SERIAL          PRIMARY KEY,
-    ID_OWNER    INTEGER         NOT NULL REFERENCES UTILIZATORI(ID), 
-    nume        VARCHAR(255)    UNIQUE NOT NULL, 
-    locatie     VARCHAR(255)    NULL,        
+    ID_OWNER    INTEGER         NOT NULL REFERENCES UTILIZATORI(ID),
+    nume        VARCHAR(255)    UNIQUE NOT NULL,
+    locatie     VARCHAR(255)    NOT NULL,
     descriere   TEXT            NULL
 );
 
@@ -32,12 +32,11 @@ CREATE TABLE JOIN_PE (
     PachetID        INTEGER     REFERENCES PACHETE(ID) ON DELETE CASCADE,
     EvenimentID     INTEGER     REFERENCES EVENIMENTE(ID) ON DELETE CASCADE,
     numarLocuri     INTEGER     NULL,
-    
-    PRIMARY KEY (PachetID, EvenimentID) 
+    PRIMARY KEY (PachetID, EvenimentID)
 );
 
 CREATE TABLE BILETE (
-    COD             VARCHAR(50)     PRIMARY KEY, 
-    PachetID        INTEGER         REFERENCES PACHETE(ID) ON DELETE SET NULL, 
-    EvenimentID     INTEGER         REFERENCES EVENIMENTE(ID) ON DELETE SET NULL  
+    COD             VARCHAR(50)     PRIMARY KEY,
+    PachetID        INTEGER         REFERENCES PACHETE(ID) ON DELETE SET NULL,
+    EvenimentID     INTEGER         REFERENCES EVENIMENTE(ID) ON DELETE SET NULL
 );
