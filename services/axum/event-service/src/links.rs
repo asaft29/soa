@@ -1,4 +1,6 @@
 use crate::models::event::Event;
+use crate::models::event_packets::EventPackets;
+use crate::models::ticket::Ticket;
 use serde::Serialize;
 use std::collections::HashMap;
 
@@ -16,13 +18,29 @@ pub struct Links {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub parent: Option<Link>,
     #[serde(flatten)]
-    pub others: HashMap<String, Link>,
+    pub others: Option<HashMap<String, Link>>,
 }
 
 #[derive(Serialize, Debug)]
 pub struct EventResponse {
     #[serde(flatten)]
     pub event: Event,
+    #[serde(rename = "_links")]
+    pub links: Links,
+}
+
+#[derive(Serialize, Debug)]
+pub struct EventPacketResponse {
+    #[serde(flatten)]
+    pub event_packet: EventPackets,
+    #[serde(rename = "_links")]
+    pub links: Links,
+}
+
+#[derive(Serialize, Debug)]
+pub struct TicketResponse {
+    #[serde(flatten)]
+    pub ticket: Ticket,
     #[serde(rename = "_links")]
     pub links: Links,
 }
@@ -61,13 +79,70 @@ impl EventResponse {
                     href: format!("{}/events", base_url),
                     r#type: None,
                 }),
-                others: other_links,
+                others: Some(other_links),
             },
         }
     }
 }
 
-#[derive(Serialize, Debug)]
-pub struct EventResponseWrapper {
-    pub event: EventResponse,
+impl EventPacketResponse {
+    pub fn new(event_packet: EventPackets, base_url: &str) -> Self {
+        let packet_id = event_packet.id;
+        let self_href = format!("{}/event-packets/{}", base_url, packet_id);
+
+        let mut other_links = HashMap::new();
+
+        other_links.insert(
+            "events".to_string(),
+            Link {
+                href: format!("{}/event-packets/{}/events", base_url, packet_id),
+                r#type: Some("GET".to_string()),
+            },
+        );
+
+        other_links.insert(
+            "tickets".to_string(),
+            Link {
+                href: format!("{}/event-packets/{}/tickets", base_url, packet_id),
+                r#type: Some("GET".to_string()),
+            },
+        );
+
+        Self {
+            event_packet,
+            links: Links {
+                link: Link {
+                    href: self_href,
+                    r#type: None,
+                },
+                parent: Some(Link {
+                    href: format!("{}/event-packets", base_url),
+                    r#type: None,
+                }),
+                others: Some(other_links),
+            },
+        }
+    }
+}
+
+impl TicketResponse {
+    pub fn new(ticket: Ticket, base_url: &str) -> Self {
+        let ticket_cod = &ticket.cod;
+        let self_href = format!("{}/tickets/{}", base_url, ticket_cod);
+
+        Self {
+            ticket,
+            links: Links {
+                link: Link {
+                    href: self_href,
+                    r#type: Some("GET".to_string()),
+                },
+                parent: Some(Link {
+                    href: format!("{}/tickets", base_url),
+                    r#type: Some("GET".to_string()),
+                }),
+                others: None,
+            },
+        }
+    }
 }
