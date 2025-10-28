@@ -1,8 +1,8 @@
 # ROA
 
-A REST API built using the **ROA (Rust Oriented Architecture)** approach—a (joking) term for a microservice-based architecture.
+A REST API built using the **ROA (Rust Oriented Architecture)** approach—a term for a microservice-based architecture.
 
-***Disclaimer:*** *"Rust Oriented Architecture" (ROA) is a term I completely made up for fun. Please don't get mad or angry about it!
+***Disclaimer:*** *Rust Oriented Architecture* (ROA) is a term I completely made up for fun. Please don't get mad or angry about it, thanks 🤓☝🏼
 
 > [!WARNING]
 > I will be forced to sue anyone who uses this groundbreaking term without giving me proper credit. This is, of course, also a joke... unless?
