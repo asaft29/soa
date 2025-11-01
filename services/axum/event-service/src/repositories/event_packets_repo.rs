@@ -1,7 +1,7 @@
-use crate::error::*;
 use crate::models::event_packets::{
     CreateEventPacket, EventPacketQuery, EventPackets, PaginationParams, UpdateEventPacket,
 };
+use crate::shared::error::*;
 use anyhow::Result;
 use sqlx::{Error, PgPool, Postgres, QueryBuilder};
 
@@ -77,6 +77,7 @@ impl EventPacketRepo {
         query_builder.push(" OFFSET ");
         query_builder.push_bind(offset);
     }
+
     pub async fn get_event_packet(
         &self,
         packet_id: i32,
