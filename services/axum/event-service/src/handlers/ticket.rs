@@ -1,10 +1,10 @@
 use crate::AppState;
 use crate::models::ticket::{CreateTicket, Ticket, UpdateTicket};
-use crate::shared::error::TicketRepoError;
+use crate::shared::error::ApiError;
 use crate::shared::links;
 use crate::shared::links::{Response, build_ticket_over_event, build_ticket_over_packet};
+use axum::extract::rejection::JsonRejection;
 use axum::response::IntoResponse;
-
 use axum::{
     Json, Router,
     extract::{Path, State},
@@ -12,6 +12,7 @@ use axum::{
     routing::{get, post},
 };
 use std::sync::Arc;
+use validator::Validate;
 
 #[utoipa::path(
     get,
@@ -29,7 +30,7 @@ use std::sync::Arc;
 pub async fn get_ticket(
     State(state): State<Arc<AppState>>,
     Path(cod): Path<String>,
-) -> Result<impl IntoResponse, TicketRepoError> {
+) -> Result<impl IntoResponse, ApiError> {
     let ticket = state.ticket_repo.get_ticket(&cod).await?;
 
     let ticket_response = links::build_simple_ticket(ticket, &state.base_url);
@@ -48,7 +49,7 @@ pub async fn get_ticket(
 )]
 pub async fn list_tickets(
     State(state): State<Arc<AppState>>,
-) -> Result<impl IntoResponse, TicketRepoError> {
+) -> Result<impl IntoResponse, ApiError> {
     let tickets = state.ticket_repo.list_tickets().await?;
 
     let wrapped: Vec<Response<Ticket>> = tickets
@@ -76,8 +77,12 @@ pub async fn list_tickets(
 pub async fn update_ticket(
     State(state): State<Arc<AppState>>,
     Path(cod): Path<String>,
-    Json(payload): Json<UpdateTicket>,
-) -> Result<impl IntoResponse, TicketRepoError> {
+    payload: Result<Json<UpdateTicket>, JsonRejection>,
+) -> Result<impl IntoResponse, ApiError> {
+    let Json(payload) = payload?;
+
+    payload.validate()?;
+
     let ticket = state.ticket_repo.update_ticket(&cod, payload).await?;
 
     let ticket_response = links::build_simple_ticket(ticket, &state.base_url);
@@ -97,8 +102,12 @@ pub async fn update_ticket(
 )]
 pub async fn create_ticket(
     State(state): State<Arc<AppState>>,
-    Json(payload): Json<CreateTicket>,
-) -> Result<impl IntoResponse, TicketRepoError> {
+    payload: Result<Json<CreateTicket>, JsonRejection>,
+) -> Result<impl IntoResponse, ApiError> {
+    let Json(payload) = payload?;
+
+    payload.validate()?;
+
     let ticket = state.ticket_repo.create_ticket(payload).await?;
 
     let ticket_response = links::build_simple_ticket(ticket, &state.base_url);
@@ -122,7 +131,7 @@ pub async fn create_ticket(
 pub async fn delete_ticket(
     State(state): State<Arc<AppState>>,
     Path(cod): Path<String>,
-) -> Result<impl IntoResponse, TicketRepoError> {
+) -> Result<impl IntoResponse, ApiError> {
     state.ticket_repo.delete_ticket(&cod).await?;
     Ok(StatusCode::NO_CONTENT)
 }
@@ -144,7 +153,10 @@ pub async fn delete_ticket(
 pub async fn get_ticket_for_event(
     State(state): State<Arc<AppState>>,
     Path((event_id, ticket_cod)): Path<(i32, String)>,
-) -> Result<impl IntoResponse, TicketRepoError> {
+) -> Result<impl IntoResponse, ApiError> {
+    if event_id < 0 {
+        return Err(ApiError::BadRequest("ID cannot be negative".into()));
+    }
     let ticket = state
         .ticket_repo
         .get_ticket_for_event(event_id, &ticket_cod)
@@ -170,7 +182,10 @@ pub async fn get_ticket_for_event(
 pub async fn list_tickets_for_event(
     State(state): State<Arc<AppState>>,
     Path(event_id): Path<i32>,
-) -> Result<impl IntoResponse, TicketRepoError> {
+) -> Result<impl IntoResponse, ApiError> {
+    if event_id < 0 {
+        return Err(ApiError::BadRequest("ID cannot be negative".into()));
+    }
     let tickets = state.ticket_repo.list_tickets_for_event(event_id).await?;
 
     let wrapped: Vec<Response<Ticket>> = tickets
@@ -199,8 +214,15 @@ pub async fn list_tickets_for_event(
 pub async fn update_ticket_for_event(
     State(state): State<Arc<AppState>>,
     Path((event_id, ticket_cod)): Path<(i32, String)>,
-    Json(payload): Json<UpdateTicket>,
-) -> Result<impl IntoResponse, TicketRepoError> {
+    payload: Result<Json<UpdateTicket>, JsonRejection>,
+) -> Result<impl IntoResponse, ApiError> {
+    if event_id < 0 {
+        return Err(ApiError::BadRequest("ID cannot be negative".into()));
+    }
+    let Json(payload) = payload?;
+
+    payload.validate()?;
+
     let ticket = state
         .ticket_repo
         .update_ticket_for_event(event_id, &ticket_cod, payload)
@@ -227,8 +249,16 @@ pub async fn update_ticket_for_event(
 pub async fn create_ticket_for_event(
     State(state): State<Arc<AppState>>,
     Path(event_id): Path<i32>,
-    Json(payload): Json<CreateTicket>,
-) -> Result<impl IntoResponse, TicketRepoError> {
+    payload: Result<Json<CreateTicket>, JsonRejection>,
+) -> Result<impl IntoResponse, ApiError> {
+    if event_id < 0 {
+        return Err(ApiError::BadRequest("ID cannot be negative".into()));
+    }
+
+    let Json(payload) = payload?;
+
+    payload.validate()?;
+
     let ticket = state
         .ticket_repo
         .create_ticket_for_event(event_id, payload)
@@ -256,7 +286,10 @@ pub async fn create_ticket_for_event(
 pub async fn delete_ticket_for_event(
     State(state): State<Arc<AppState>>,
     Path((event_id, ticket_cod)): Path<(i32, String)>,
-) -> Result<impl IntoResponse, TicketRepoError> {
+) -> Result<impl IntoResponse, ApiError> {
+    if event_id < 0 {
+        return Err(ApiError::BadRequest("ID cannot be negative".into()));
+    }
     state
         .ticket_repo
         .delete_ticket_for_event(event_id, ticket_cod)
@@ -279,7 +312,10 @@ pub async fn delete_ticket_for_event(
 pub async fn list_tickets_for_packet(
     State(state): State<Arc<AppState>>,
     Path(packet_id): Path<i32>,
-) -> Result<impl IntoResponse, TicketRepoError> {
+) -> Result<impl IntoResponse, ApiError> {
+    if packet_id < 0 {
+        return Err(ApiError::BadRequest("ID cannot be negative".into()));
+    }
     let tickets = state.ticket_repo.list_tickets_for_packet(packet_id).await?;
 
     let wrapped: Vec<Response<Ticket>> = tickets
@@ -307,7 +343,10 @@ pub async fn list_tickets_for_packet(
 pub async fn get_ticket_for_packet(
     State(state): State<Arc<AppState>>,
     Path((packet_id, ticket_cod)): Path<(i32, String)>,
-) -> Result<impl IntoResponse, TicketRepoError> {
+) -> Result<impl IntoResponse, ApiError> {
+    if packet_id < 0 {
+        return Err(ApiError::BadRequest("ID cannot be negative".into()));
+    }
     let ticket = state
         .ticket_repo
         .get_ticket_for_packet(packet_id, &ticket_cod)
@@ -334,8 +373,15 @@ pub async fn get_ticket_for_packet(
 pub async fn create_ticket_for_packet(
     State(state): State<Arc<AppState>>,
     Path(packet_id): Path<i32>,
-    Json(payload): Json<CreateTicket>,
-) -> Result<impl IntoResponse, TicketRepoError> {
+    payload: Result<Json<CreateTicket>, JsonRejection>,
+) -> Result<impl IntoResponse, ApiError> {
+    if packet_id < 0 {
+        return Err(ApiError::BadRequest("ID cannot be negative".into()));
+    }
+    let Json(payload) = payload?;
+
+    payload.validate()?;
+
     let ticket = state
         .ticket_repo
         .create_ticket_for_packet(packet_id, payload)
@@ -364,8 +410,15 @@ pub async fn create_ticket_for_packet(
 pub async fn update_ticket_for_packet(
     State(state): State<Arc<AppState>>,
     Path((packet_id, ticket_cod)): Path<(i32, String)>,
-    Json(payload): Json<UpdateTicket>,
-) -> Result<impl IntoResponse, TicketRepoError> {
+    payload: Result<Json<UpdateTicket>, JsonRejection>,
+) -> Result<impl IntoResponse, ApiError> {
+    if packet_id < 0 {
+        return Err(ApiError::BadRequest("ID cannot be negative".into()));
+    }
+    let Json(payload) = payload?;
+
+    payload.validate()?;
+
     let ticket = state
         .ticket_repo
         .update_ticket_for_packet(packet_id, &ticket_cod, payload)
@@ -393,7 +446,10 @@ pub async fn update_ticket_for_packet(
 pub async fn delete_ticket_for_packet(
     State(state): State<Arc<AppState>>,
     Path((packet_id, ticket_cod)): Path<(i32, String)>,
-) -> Result<impl IntoResponse, TicketRepoError> {
+) -> Result<impl IntoResponse, ApiError> {
+    if packet_id < 0 {
+        return Err(ApiError::BadRequest("ID cannot be negative".into()));
+    }
     state
         .ticket_repo
         .delete_ticket_for_packet(packet_id, &ticket_cod)

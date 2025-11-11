@@ -3,9 +3,10 @@ use crate::handlers::ticket;
 use crate::models::event_packets::{
     CreateEventPacket, EventPacketQuery, EventPackets, UpdateEventPacket,
 };
-use crate::shared::error::EventPacketRepoError;
+use crate::shared::error::ApiError;
 use crate::shared::links::{Response, build_filtered_event_packets, build_simple_event_packet};
 use axum::extract::Query;
+use axum::extract::rejection::JsonRejection;
 use axum::response::IntoResponse;
 use axum::{
     Json, Router,
@@ -14,6 +15,7 @@ use axum::{
     routing::{get, post},
 };
 use std::sync::Arc;
+use validator::Validate;
 
 #[utoipa::path(
     get,
@@ -33,7 +35,9 @@ use std::sync::Arc;
 pub async fn list_event_packets(
     State(state): State<Arc<AppState>>,
     Query(params): Query<EventPacketQuery>,
-) -> Result<impl IntoResponse, EventPacketRepoError> {
+) -> Result<impl IntoResponse, ApiError> {
+    params.validate()?;
+
     let event_packets = state
         .event_packet_repo
         .list_event_packets(params.clone())
@@ -69,7 +73,10 @@ pub async fn list_event_packets(
 pub async fn get_event_packet(
     State(state): State<Arc<AppState>>,
     Path(id): Path<i32>,
-) -> Result<impl IntoResponse, EventPacketRepoError> {
+) -> Result<impl IntoResponse, ApiError> {
+    if id < 0 {
+        return Err(ApiError::BadRequest("ID cannot be negative".into()));
+    }
     let event_packet = state.event_packet_repo.get_event_packet(id).await?;
 
     let packet_response = build_simple_event_packet(event_packet, &state.base_url);
@@ -91,8 +98,15 @@ pub async fn get_event_packet(
 pub async fn update_event_packet(
     State(state): State<Arc<AppState>>,
     Path(id): Path<i32>,
-    Json(payload): Json<UpdateEventPacket>,
-) -> Result<impl IntoResponse, EventPacketRepoError> {
+    payload: Result<Json<UpdateEventPacket>, JsonRejection>,
+) -> Result<impl IntoResponse, ApiError> {
+    if id < 0 {
+        return Err(ApiError::BadRequest("ID cannot be negative".into()));
+    }
+    let Json(payload) = payload?;
+
+    payload.validate()?;
+
     let event_packet = state
         .event_packet_repo
         .update_event_packet(id, payload)
@@ -115,8 +129,12 @@ pub async fn update_event_packet(
 )]
 pub async fn create_event_packet(
     State(state): State<Arc<AppState>>,
-    Json(payload): Json<CreateEventPacket>,
-) -> Result<impl IntoResponse, EventPacketRepoError> {
+    payload: Result<Json<CreateEventPacket>, JsonRejection>,
+) -> Result<impl IntoResponse, ApiError> {
+    let Json(payload) = payload?;
+
+    payload.validate()?;
+
     let event_packet = state.event_packet_repo.create_event_packet(payload).await?;
 
     let packet_response = build_simple_event_packet(event_packet, &state.base_url);
@@ -137,7 +155,10 @@ pub async fn create_event_packet(
 pub async fn delete_event_packet(
     State(state): State<Arc<AppState>>,
     Path(id): Path<i32>,
-) -> Result<impl IntoResponse, EventPacketRepoError> {
+) -> Result<impl IntoResponse, ApiError> {
+    if id < 0 {
+        return Err(ApiError::BadRequest("ID cannot be negative".into()));
+    }
     state.event_packet_repo.delete_event_packet(id).await?;
     Ok(StatusCode::NO_CONTENT)
 }
